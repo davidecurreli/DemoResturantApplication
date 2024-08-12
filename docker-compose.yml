@@ -1,0 +1,102 @@
+version: '3.4'
+
+services:
+  ##########################################
+  # menumicroservice app + dapr sidecar
+  ##########################################
+  menumicroservice:
+    image: menumicroservice
+    build:
+      context: .
+      dockerfile: MenuMicroservice/Dockerfile
+    networks:
+      - my-dapr-network
+
+  menumicroservice-dapr:
+    image: "daprio/daprd:latest"
+    container_name: menumicroservice-dapr
+    restart: always
+    command: ["./daprd", "-app-id", "menumicroservice", "-app-port", "8080", "-resources-path", "/components", "-log-level", "debug"]
+    volumes:
+      - "./Components/:/components/"
+      - "./Secrets:/secrets"
+    depends_on:
+      - menumicroservice
+    network_mode: "service:menumicroservice"
+
+  #########################################
+  # applicationgateway app + dapr sidecar
+  ##########################################
+  applicationgateway:
+    image: applicationgateway
+    build:
+      context: .
+      dockerfile: ApplicationGateway/Dockerfile
+    networks:
+      - my-dapr-network
+    ports:
+      - "14289:8080"
+    volumes:
+      - "./Certificate:/app/Certificate/"
+    restart: on-failure
+
+  applicationgateway-dapr:
+    image: "daprio/daprd:latest" 
+    container_name: applicationgateway-dapr
+    restart: always
+    command: ["./daprd","-app-id", "applicationgateway", "-app-port", "8080", "-resources-path", "/components", "-log-level", "debug"]
+    volumes:
+      - "./Components/local-secret-store.yaml:/components/local-secret-store.yaml"
+      - "./Secrets:/secrets"
+    depends_on:
+      - applicationgateway
+    network_mode: "service:applicationgateway"
+
+  ##########################################
+  # ordersmicroservice app + dapr sidecar
+  ##########################################
+  ordersmicroservice:
+    image: ordersmicroservice
+    build:
+      context: .
+      dockerfile: OrdersMicroservice/Dockerfile
+    networks:
+      - my-dapr-network
+    volumes:
+      - "./Certificate:/app/Certificate/"
+    restart: on-failure
+
+  ordersmicroservice-dapr:
+    image: "daprio/daprd:latest"
+    container_name: ordersmicroservice-dapr
+    restart: always
+    command: ["./daprd","-app-id", "ordersmicroservice", "-app-port", "8080", "-resources-path", "/components", "-log-level", "debug"]
+    volumes:
+      - "./Components/local-secret-store.yaml:/components/local-secret-store.yaml"
+      - "./Secrets:/secrets"
+    depends_on:
+      - ordersmicroservice
+    network_mode: "service:ordersmicroservice"
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: mssqlServer
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+      - MSSQL_PID=Developer
+    networks:
+      - my-dapr-network
+    ports:
+      - "1435:1433"
+    user: root
+    volumes:
+      - mssql_data:/var/opt/mssql
+
+volumes:
+  mssql_data:
+
+networks:
+  my-dapr-network:
+    external: true
+    driver: bridge

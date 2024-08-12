@@ -1,0 +1,15 @@
+{
+  "profiles": {
+    "Docker Compose": {
+      "commandName": "DockerCompose",
+      "commandVersion": "1.0",
+      "serviceActions": {
+        //"applicationgateway": "StartDebugging",
+        "menumicroservice": "StartDebugging",
+        //"ordersmicroservice": "StartDebugging",
+        //"applicationgateway-dapr": "StartWithoutDebugging",
+        "menumicroservice-dapr": "StartWithoutDebugging"
+      }
+    }
+  }
+}
