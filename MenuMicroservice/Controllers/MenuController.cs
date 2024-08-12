@@ -7,6 +7,6 @@ namespace MenuMicroservice.Controllers;
 
 [ApiController]
 [Route("menu/api/[controller]")]
-public class MenuItemController(IGenericCoreService<Menu> dataService): GenericController<Menu>(dataService)
+public class MenuItemController(IGenericCoreService<MenuItem> dataService): GenericController<MenuItem>(dataService)
 {
 }

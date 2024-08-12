@@ -24,8 +24,8 @@ CREATE TABLE Customer (
     UpdatedOn DATETIME2 NOT NULL DEFAULT GETDATE()
 );
 
--- Create the Menu table
-CREATE TABLE Menu (
+-- Create the MenuItem table
+CREATE TABLE MenuItem (
     id INT PRIMARY KEY IDENTITY(1,1),
     ItemName NVARCHAR(100) NOT NULL,
     Description NVARCHAR(255),
@@ -51,13 +51,13 @@ CREATE TABLE [Order] (
 CREATE TABLE OrderItems (
     id INT PRIMARY KEY IDENTITY(1,1),
     OrderID INT,
-    MenuID INT,
+    MenuItemID INT,
     Quantity INT NOT NULL,
     UnitPrice DECIMAL(10, 2) NOT NULL,
     CreatedOn DATETIME2 NOT NULL DEFAULT GETDATE(),
     UpdatedOn DATETIME2 NOT NULL DEFAULT GETDATE(),
     FOREIGN KEY (OrderID) REFERENCES [Order](id),
-    FOREIGN KEY (MenuID) REFERENCES Menu(id)
+    FOREIGN KEY (MenuItemID) REFERENCES MenuItem(id)
 );
 
 -- Insert sample data into Customer table
@@ -67,8 +67,8 @@ VALUES
 ('Jane', 'Smith', 'jane.smith@email.com', '555-5678'),
 ('Mike', 'Johnson', 'mike.johnson@email.com', '555-9012');
 
--- Insert sample data into Menu table
-INSERT INTO Menu (ItemName, Description, Price, Category)
+-- Insert sample data into MenuItem table
+INSERT INTO MenuItem (ItemName, Description, Price, Category)
 VALUES 
 ('Margherita Pizza', 'Classic tomato and mozzarella pizza', 12.99, 'Pizza'),
 ('Caesar Salad', 'Romaine lettuce with Caesar dressing and croutons', 8.99, 'Salad'),
@@ -84,7 +84,7 @@ VALUES
 (3, '2024-08-12 20:00:00', 25.98, 'Pending');
 
 -- Insert sample data into OrderItems table
-INSERT INTO OrderItems (OrderID, MenuID, Quantity, UnitPrice)
+INSERT INTO OrderItems (OrderID, MenuItemID, Quantity, UnitPrice)
 VALUES 
 (1, 1, 1, 12.99),  -- Margherita Pizza
 (1, 2, 1, 8.99),   -- Caesar Salad
