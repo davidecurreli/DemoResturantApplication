@@ -8,11 +8,28 @@ namespace OrdersMicroservice.Controllers;
 [ApiController]
 [Route("orders/api/[controller]")]
 public class OrderController(
-     IGenericCoreService<Order> dataService, 
+    IGenericCoreService<Order> dataService, 
     IGenericCoreService<Customer> customerService, 
     IGenericCoreService<MenuItem> menuItemService,
     IGenericCoreService<OrderItem> orderItemService) : GenericController<Order>(dataService)
 {
+    [HttpGet]
+    [Route("GetOrderDetails/{orderId}")]
+    public async Task<ActionResult<GetMyOrderDetailResponse>> GetOrderDetailsAsync(int orderId)
+    {
+        var orderItems = orderItemService.GetQueryable(x => x.OrderID == orderId).ToList();
+
+        var menuItems = new List<MenuItem>();
+
+        foreach (var orderItem in orderItems) 
+        {
+            menuItems.Add(await menuItemService.GetById(orderItem.MenuItemID) ?? throw new Exception());
+        }
+
+        return Ok(new GetMyOrderDetailResponse(menuItems));
+    }
+    public record GetMyOrderDetailResponse(List<MenuItem>? Items);
+
     [HttpGet]
     [Route("GetMyOrders/{mail}")]
 
