@@ -1,5 +1,7 @@
 using Infrastructure;
 
+string appName = typeof(Program).Assembly.GetName().Name ?? "MenuMicroservice";
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -12,8 +14,19 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
-app.UseAuthorization();
-
 app.MapControllers();
 
-app.Run();
+// Liveness Check required for daprSidecar
+app.MapGet("/", Results.NoContent);
+app.MapGet("/dapr/config", Results.NoContent);
+app.MapGet("/dapr/subscribe", Results.NoContent);
+
+try
+{
+    app.Logger.LogInformation("Starting API gateway ({ApplicationName})...", appName);
+    app.Run();
+}
+catch (Exception ex)
+{
+    app.Logger.LogCritical(ex, "API gateway terminated unexpectedly ({ApplicationName})...", appName);
+}
