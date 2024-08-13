@@ -2,27 +2,27 @@ version: '3.4'
 
 services:
   ##########################################
-  # menumicroservice app + dapr sidecar
+  # frontmicroservice app + dapr sidecar
   ##########################################
-  menumicroservice:
-    image: menumicroservice
+  frontmicroservice:
+    image: frontmicroservice
     build:
       context: .
       dockerfile: MenuMicroservice/Dockerfile
     networks:
       - my-dapr-network
 
-  menumicroservice-dapr:
+  frontmicroservice-dapr:
     image: "daprio/daprd:latest"
-    container_name: menumicroservice-dapr
+    container_name: frontmicroservice-dapr
     restart: always
-    command: ["./daprd", "-app-id", "menumicroservice", "-app-port", "8080", "-resources-path", "/components", "-log-level", "error"]
+    command: ["./daprd", "-app-id", "frontmicroservice", "-app-port", "8080", "-resources-path", "/components", "-log-level", "error"]
     volumes:
       - "./Components/:/components/"
       - "./Secrets:/secrets"
     depends_on:
-      - menumicroservice
-    network_mode: "service:menumicroservice"
+      - frontmicroservice
+    network_mode: "service:frontmicroservice"
 
   #########################################
   # applicationgateway app + dapr sidecar

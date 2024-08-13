@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace MenuMicroservice.Controllers;
 
 [ApiController]
-[Route("menu/api/[controller]")]
+[Route("front/api/[controller]")]
 public class MenuItemController(IGenericCoreService<MenuItem> dataService): GenericController<MenuItem>(dataService)
 {
 }

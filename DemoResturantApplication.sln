@@ -5,7 +5,7 @@ VisualStudioVersion = 17.10.35013.160
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ResturantBackend", "ResturantBackend", "{611889C0-19D3-486A-94A1-64CC2822AA0A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "MenuMicroservice", "MenuMicroservice\MenuMicroservice.csproj", "{4AEFA10B-4CCA-4541-80ED-9E83401AAD97}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FrontMicroservice", "MenuMicroservice\FrontMicroservice.csproj", "{4AEFA10B-4CCA-4541-80ED-9E83401AAD97}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrdersMicroservice", "OrdersMicroservice\OrdersMicroservice.csproj", "{67B656D2-B521-45D9-B6D2-7EB43C436D66}"
 EndProject

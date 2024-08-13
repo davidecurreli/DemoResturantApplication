@@ -8,3 +8,5 @@ public record GetMyOrderDetailResponse(List<MenuItem>? Items);
 
 public record SendOrderRequest(Dictionary<int, int> OrderItems, string CustomerEmail,
     string CustomerFirstname, string CustomerLastname, string CustomerPhone);
+
+public record UpdateOrderStatusRequest(int OrderId, string OrderStatus);

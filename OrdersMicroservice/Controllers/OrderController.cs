@@ -99,4 +99,20 @@ public class OrderController(
 
         return Ok(newOrder.Id);
     }
+
+    [HttpPut]
+    [Route("UpdateOrderStatus")]
+    public async Task<ActionResult> UpdateOrderStatus(UpdateOrderStatusRequest orderStatusRequest)
+    {
+        var order = await _dataService.GetById(orderStatusRequest.OrderId);
+
+        if (order is null)
+            return BadRequest("Invalid order");
+
+        order.Status = orderStatusRequest.OrderStatus;
+
+        _dataService.Update(order);
+
+        return NoContent();
+    }
 }
