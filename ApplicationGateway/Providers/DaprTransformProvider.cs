@@ -3,6 +3,8 @@ using Yarp.ReverseProxy.Transforms.Builder;
 
 namespace ApplicationGateway.Providers;
 
+// Yarp request transformer. It translates the incoming request to the dapr invokation template to connect to the underlining microservice
+// PATCH/POST/GET/PUT/DELETE http://localhost:<daprPort=3500>/v1.0/invoke/<appID>/method/<method-name>
 public class DaprTransformProvider : ITransformProvider
 {
     public void Apply(TransformBuilderContext context)

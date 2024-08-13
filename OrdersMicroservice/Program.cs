@@ -23,10 +23,10 @@ app.MapGet("/dapr/subscribe", Results.NoContent);
 
 try
 {
-    app.Logger.LogInformation("Starting API gateway ({ApplicationName})...", appName);
+    app.Logger.LogInformation("Starting ({ApplicationName})...", appName);
     app.Run();
 }
 catch (Exception ex)
 {
-    app.Logger.LogCritical(ex, "API gateway terminated unexpectedly ({ApplicationName})...", appName);
+    app.Logger.LogCritical(ex, "Application terminated unexpectedly ({ApplicationName})...", appName);
 }

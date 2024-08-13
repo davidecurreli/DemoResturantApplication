@@ -24,7 +24,3 @@ catch (Exception ex)
 {
     app.Logger.LogCritical(ex, "API gateway terminated unexpectedly ({ApplicationName})...", appName);
 }
-//finally
-//{
-//   Logger.CloseAndFlush();
-//}

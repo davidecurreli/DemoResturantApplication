@@ -1,7 +1,8 @@
-﻿using Domain.Models;
+﻿using Domain.Entities;
 using Infrastructure.BaseController;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
+using OrdersMicroservice.Models;
 
 namespace OrdersMicroservice.Controllers;
 
@@ -22,13 +23,11 @@ public class OrderController(
         var menuItems = new List<MenuItem>();
 
         foreach (var orderItem in orderItems) 
-        {
-            menuItems.Add(await menuItemService.GetById(orderItem.MenuItemID) ?? throw new Exception());
-        }
+            menuItems.Add(await menuItemService.GetById(orderItem.MenuItemID) 
+                ?? throw new Exception());
 
         return Ok(new GetMyOrderDetailResponse(menuItems));
     }
-    public record GetMyOrderDetailResponse(List<MenuItem>? Items);
 
     [HttpGet]
     [Route("GetMyOrders/{mail}")]
@@ -44,7 +43,6 @@ public class OrderController(
 
         return Ok(new GetMyOrdersResponse(orders));
     }
-    public record GetMyOrdersResponse(List<Order>? Items);
 
     [HttpPost]
     [Route("SaveOrder")]
@@ -101,7 +99,4 @@ public class OrderController(
 
         return Ok(newOrder.Id);
     }
-
-    public record SendOrderRequest(Dictionary<int, int> OrderItems, string CustomerEmail, 
-        string CustomerFirstname, string CustomerLastname, string CustomerPhone);
 }

@@ -1,4 +1,4 @@
-﻿using Domain.Models;
+﻿using Domain.Entities;
 using Infrastructure.BaseController;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;

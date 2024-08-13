@@ -5,6 +5,7 @@ namespace ApplicationGateway.Helpers;
 
 public class RsaSecurityHelper
 {
+    // Used for JWT signing validation
     public static RsaSecurityKey CreateRsaSecurityKey()
     {
         var pemX509 = GetPublicKey();

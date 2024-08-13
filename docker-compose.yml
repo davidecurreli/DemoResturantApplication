@@ -16,7 +16,7 @@ services:
     image: "daprio/daprd:latest"
     container_name: menumicroservice-dapr
     restart: always
-    command: ["./daprd", "-app-id", "menumicroservice", "-app-port", "8080", "-resources-path", "/components", "-log-level", "debug"]
+    command: ["./daprd", "-app-id", "menumicroservice", "-app-port", "8080", "-resources-path", "/components", "-log-level", "error"]
     volumes:
       - "./Components/:/components/"
       - "./Secrets:/secrets"
@@ -44,7 +44,7 @@ services:
     image: "daprio/daprd:latest" 
     container_name: applicationgateway-dapr
     restart: always
-    command: ["./daprd","-app-id", "applicationgateway", "-app-port", "8080", "-resources-path", "/components", "-log-level", "debug"]
+    command: ["./daprd","-app-id", "applicationgateway", "-app-port", "8080", "-resources-path", "/components", "-log-level", "error"]
     volumes:
       - "./Components/local-secret-store.yaml:/components/local-secret-store.yaml"
       - "./Secrets:/secrets"
@@ -70,7 +70,7 @@ services:
     image: "daprio/daprd:latest"
     container_name: ordersmicroservice-dapr
     restart: always
-    command: ["./daprd","-app-id", "ordersmicroservice", "-app-port", "8080", "-resources-path", "/components", "-log-level", "debug"]
+    command: ["./daprd","-app-id", "ordersmicroservice", "-app-port", "8080", "-resources-path", "/components", "-log-level", "error"]
     volumes:
       - "./Components/local-secret-store.yaml:/components/local-secret-store.yaml"
       - "./Secrets:/secrets"
