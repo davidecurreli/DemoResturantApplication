@@ -105,8 +105,6 @@ The SQL Server database is initialized with sample data for customers, menu item
 
 # DemoResturantApplication
 
-[... Previous content remains the same ...]
-
 ## API Endpoints
 
 Every controller inherit from the GenericController that provides a set of standard CRUD (Create, Read, Update, Delete) operations for each entity type plus every additional specific http methods. 
