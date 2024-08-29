@@ -86,12 +86,18 @@ All services are connected to a custom Docker network called `my-dapr-network` f
 
 ## Getting Started
 
+Simpler Set-up with Visual Studio 2022
+1. Create a new project by cloning this repository.
+2. In the start-up element select `docker-compose` and start the project.
+
+Standard process (might encounter caching problems as the docker files were created with VS2022)
 1. Ensure you have Docker and Docker Compose installed on your system.
 2. Clone this repository.
 3. Navigate to the project root directory.
 4. Run `docker-compose up --build` to start all services.
-5. Connect to the SQL Db at localhost,1435 user: SA password: YourStrong@Passw0rd and execute the DB creation script inside ApplicationGateway/DbCreationScript.txt to initialize the ResturantDB
-6. Access the application via the Application Gateway at `http://localhost:14289`.
+
+Connect to the SQL Db at localhost,1435 user: SA password: YourStrong@Passw0rd and execute the DB creation script inside ApplicationGateway/DbCreationScript.txt to initialize the ResturantDB
+Access the application via the Application Gateway at `http://localhost:14289`.
 
 ## Security
 
