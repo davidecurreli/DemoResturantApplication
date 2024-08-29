@@ -103,8 +103,6 @@ All services are connected to a custom Docker network called `my-dapr-network` f
 
 The SQL Server database is initialized with sample data for customers, menu items, and orders. The schema and initial data can be found in the `DbCreationScript.txt` file.
 
-# DemoResturantApplication
-
 ## API Endpoints
 
 Every controller inherit from the GenericController that provides a set of standard CRUD (Create, Read, Update, Delete) operations for each entity type plus every additional specific http methods. 
