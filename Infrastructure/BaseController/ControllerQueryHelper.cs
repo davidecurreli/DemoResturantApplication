@@ -1,62 +1,49 @@
 ﻿using System.Linq.Expressions;
-using System.Reflection.Emit;
 using System.Reflection;
+using System.Reflection.Emit;
 using Microsoft.AspNetCore.OData.Query;
 
 namespace Infrastructure.BaseController;
 
 public static class ControllerQueryHelper
 {
-    private static readonly AssemblyName _assemblyName = new() { Name = "DynamicLinqTypes" };
-    private static readonly ModuleBuilder _moduleBuilder;
-    private static readonly Dictionary<string, Type> _builtTypes = [];
+    private static readonly AssemblyName AssemblyName = new("DynamicLinqTypes");
+    private static readonly ModuleBuilder ModuleBuilder;
+    private static readonly Dictionary<string, Type> BuiltTypes = [];
 
     static ControllerQueryHelper()
     {
-        _moduleBuilder = AssemblyBuilder.DefineDynamicAssembly(_assemblyName, AssemblyBuilderAccess.Run).DefineDynamicModule(_assemblyName.Name);
+        ModuleBuilder = AssemblyBuilder.DefineDynamicAssembly(AssemblyName, AssemblyBuilderAccess.Run).DefineDynamicModule(AssemblyName.Name ?? "");
     }
 
-    public static Type CreateDynamicType(Dictionary<string, Type>? fields)
+    public static Type CreateDynamicType(Dictionary<string, Type> fields)
     {
         ArgumentNullException.ThrowIfNull(fields);
-
         if (fields.Count == 0)
-            throw new ArgumentOutOfRangeException(nameof(fields), "fields must have at least 1 field definition");
+            throw new ArgumentException("Fields must have at least 1 field definition", nameof(fields));
 
         string className = $"anonymous_{GetTypeKey(fields).GetHashCode()}";
 
-        if (_builtTypes.TryGetValue(className, out Type? value))
+        if (BuiltTypes.TryGetValue(className, out Type? value))
             return value;
 
-        TypeBuilder typeBuilder = _moduleBuilder.DefineType(className, TypeAttributes.Public | TypeAttributes.Class);
+        TypeBuilder typeBuilder = ModuleBuilder.DefineType(className, TypeAttributes.Public | TypeAttributes.Class);
 
-        foreach (var field in fields)
-            typeBuilder.DefineField(field.Key, field.Value, FieldAttributes.Public);
+        foreach (var (fieldName, fieldType) in fields)
+            typeBuilder.DefineField(fieldName, fieldType, FieldAttributes.Public);
 
-        _builtTypes[className] = typeBuilder.CreateType();
-
-        return _builtTypes[className];
+        BuiltTypes[className] = typeBuilder.CreateType();
+        return BuiltTypes[className];
     }
 
-    private static string GetTypeKey(Dictionary<string, Type> fields)
+    public static Type GetDynamicType(IEnumerable<PropertyInfo>? fields)
     {
-        string key = string.Empty;
-        foreach (var field in fields)
-            key += field.Key + ";" + field.Value.Name + ";";
+        ArgumentNullException.ThrowIfNull(fields);
 
-        return key;
-    }
-
-    public static Type GetDynamicType(IEnumerable<PropertyInfo?> fields)
-    {
-        var keyValuePairs = new Dictionary<string, Type>();
-        foreach (var field in fields)
-        {
-            if (field is null)
-                throw new Exception();
-
-            keyValuePairs.Add(field.Name, field.PropertyType);
-        }
+        var keyValuePairs = fields.ToDictionary(
+            field => field.Name,
+            field => field.PropertyType
+        );
         return CreateDynamicType(keyValuePairs);
     }
 
@@ -64,10 +51,7 @@ public static class ControllerQueryHelper
     {
         ArgumentNullException.ThrowIfNull(obj);
 
-        var field = obj.GetType().GetField(fieldName, BindingFlags.IgnoreCase |
-                                                      BindingFlags.Public |
-                                                      BindingFlags.NonPublic |
-                                                      BindingFlags.Instance)
+        var field = obj.GetType().GetField(fieldName, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
             ?? throw new ArgumentException("No such field was found.", nameof(fieldName));
 
         if (!typeof(T).IsAssignableFrom(field.FieldType))
@@ -81,13 +65,12 @@ public static class ControllerQueryHelper
         var enumerable = Enumerable.Empty<T>().AsQueryable();
         var param = Expression.Parameter(typeof(T));
 
-        if (filter is not null)
+        if (filter != null)
         {
             enumerable = (IQueryable<T>)filter.ApplyTo(enumerable, new ODataQuerySettings());
 
-            if (enumerable.Expression is MethodCallExpression mce)
-                if (mce.Arguments[1] is UnaryExpression quote)
-                    return quote.Operand as Expression<Func<T, bool>>;
+            if (enumerable.Expression is MethodCallExpression mce && mce.Arguments[1] is UnaryExpression quote)
+                return quote.Operand as Expression<Func<T, bool>>;
         }
         return Expression.Lambda<Func<T, bool>>(Expression.Constant(true), param);
     }
@@ -103,25 +86,27 @@ public static class ControllerQueryHelper
 
     public static Func<T, T1> BuildSelectClause<T1, T>(List<string> columns, IQueryable<T> source)
     {
-        var sourceProperties = new Dictionary<string, PropertyInfo?>();
+        var sourceProperties = columns.ToDictionary(
+            column => column.ToLower(),
+            column => source.ElementType.GetProperty(column, BindingFlags.IgnoreCase | BindingFlags.Public | BindingFlags.Instance)
+        );
 
-        foreach (var column in columns)
-            sourceProperties.Add(column.ToLower(), source.ElementType.GetProperty(column, BindingFlags.IgnoreCase |
-                                                                                          BindingFlags.Public |
-                                                                                          BindingFlags.Instance));
         var dynamicType = GetDynamicType(sourceProperties.Values);
 
         ParameterExpression sourceItem = Expression.Parameter(source.ElementType, "t");
-        IEnumerable<MemberBinding> bindings = dynamicType.GetFields()
-            .Select(
-                p => Expression.Bind(p, Expression.Property(sourceItem, sourceProperties[p.Name.ToLower()] ?? throw new Exception()))
-            ).OfType<MemberBinding>();
+        var bindings = dynamicType.GetFields()
+            .Select(p => Expression.Bind(p, Expression.Property(sourceItem, sourceProperties[p.Name.ToLower()])))
+            .OfType<MemberBinding>();
 
-        var xInit = Expression.MemberInit(Expression.New(dynamicType.GetConstructor(Type.EmptyTypes) ?? throw new Exception()), bindings);
+        var xInit = Expression.MemberInit(Expression.New(dynamicType.GetConstructor(Type.EmptyTypes)), bindings);
 
         var lambda = Expression.Lambda<Func<T, T1>>(xInit, sourceItem);
 
         return lambda.Compile();
     }
-}
 
+    private static string GetTypeKey(Dictionary<string, Type> fields)
+    {
+        return string.Join(";", fields.Select(kvp => $"{kvp.Key};{kvp.Value.Name}"));
+    }
+}

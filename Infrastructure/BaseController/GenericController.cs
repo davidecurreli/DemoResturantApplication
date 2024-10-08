@@ -1,182 +1,106 @@
-﻿using Domain;
+﻿using System.Net;
+using System.Reflection;
+using Domain;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.OData.UriParser;
-using System.Dynamic;
-using System.Net;
-using System.Reflection;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace Infrastructure.BaseController;
+
 public class GenericController<TEntity>(IGenericCoreService<TEntity> dataService) : ControllerBase where TEntity : BaseEntity
 {
-    public readonly IGenericCoreService<TEntity> _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
-    private readonly JsonSerializerOptions _jsonSettings = new()
-    {
-        ReferenceHandler = ReferenceHandler.IgnoreCycles
-    };
+    protected readonly IGenericCoreService<TEntity> _dataService = dataService ?? throw new ArgumentNullException(nameof(dataService));
 
     [HttpGet]
     [Route("Get")]
     public virtual IActionResult Get(ODataQueryOptions<TEntity> options)
     {
         IQueryable<TEntity> query;
-        if (options.SelectExpand is not null && options.SelectExpand.RawExpand is not null)
+        if (options.SelectExpand?.RawExpand != null)
             query = _dataService.GetQueryable(includes: options.SelectExpand.RawExpand);
         else
             query = _dataService.GetQueryable();
 
-
-        if (options.Filter is not null)
+        // Apply filter
+        if (options.Filter != null)
         {
             var filterExpression = ControllerQueryHelper.GetFilterExpression<TEntity>(options.Filter);
-            if (filterExpression is not null)
+            if (filterExpression != null)
                 query = query.Where(filterExpression);
         }
 
+        // Apply ordering
         if (options.OrderBy != null)
         {
             foreach (var orderByClause in options.OrderBy.OrderByNodes)
             {
-                var orderByPropertyNode = orderByClause as OrderByPropertyNode ?? throw new Exception("orderByClause not valid");
-
-                var propertyName = orderByPropertyNode.Property.Name;
-                var direction = orderByPropertyNode.Direction;
-
-                if (!string.IsNullOrEmpty(propertyName))
+                if (orderByClause is OrderByPropertyNode orderByPropertyNode)
                 {
-                    var orderByExpression = ControllerQueryHelper.GetOrderByExpression<TEntity>(propertyName);
-                    if (direction == OrderByDirection.Ascending)
-                        query = query.OrderBy(orderByExpression);
-                    else
-                        query = query.OrderByDescending(orderByExpression);
+                    var propertyName = orderByPropertyNode.Property.Name;
+                    var direction = orderByPropertyNode.Direction;
+
+                    if (!string.IsNullOrEmpty(propertyName))
+                    {
+                        var orderByExpression = ControllerQueryHelper.GetOrderByExpression<TEntity>(propertyName);
+                        query = direction == OrderByDirection.Ascending
+                            ? query.OrderBy(orderByExpression)
+                            : query.OrderByDescending(orderByExpression);
+                    }
                 }
             }
         }
 
-        if (options.SelectExpand is not null)
+        // Handle select and expand
+        if (options.SelectExpand != null)
         {
-            var selectColumnsName = new List<string>();
-            if (options.SelectExpand.RawSelect is not null)
-                selectColumnsName = [.. options.SelectExpand.RawSelect.Split(',')];
-            else if (options.SelectExpand.RawExpand is not null)
-            {
-                var expandProperties = options.SelectExpand.RawExpand.Split(',').ToList();
-                var entityProperties = typeof(TEntity).GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-                foreach (var property in entityProperties)
-                {
-                    if (expandProperties.Contains(property.Name, StringComparer.InvariantCultureIgnoreCase))
-                    {
-                        selectColumnsName.Add(property.Name);
-                        continue;
-                    }
-
-                    bool propertyToJsonIgnore = false;
-                    foreach (var propertyAttribute in property.CustomAttributes)
-                    {
-                        var attributeName = propertyAttribute.AttributeType.Name;
-                        if (attributeName == "JsonIgnoreAttribute")
-                        {
-                            propertyToJsonIgnore = true;
-                            break;
-                        }
-                    }
-                    if (!propertyToJsonIgnore)
-                        selectColumnsName.Add(property.Name);
-                }
-            }
+            var selectColumnsName = GetSelectColumnNames(options.SelectExpand, typeof(TEntity));
 
             if (selectColumnsName.Count == 0)
                 return BadRequest("Select or Expand clause is empty");
 
             var selectClause = ControllerQueryHelper.BuildSelectClause<object, TEntity>(selectColumnsName, query);
-            var anonymousData = query.Select(selectClause).ToList();
+            var result = query.Select(selectClause).ToList();
 
-            if (anonymousData is null || anonymousData.Count == 0)
-                return Ok(new { items = Array.Empty<TEntity>() });
+            if (result == null || result.Count == 0)
+                return Ok(new { items = Array.Empty<object>() });
 
-            var result = new List<IDictionary<string, object>>();
-            foreach (var anonymousRow in anonymousData)
-            {
-                var convertedRow = new ExpandoObject() as IDictionary<string, object>;
-                foreach (var propName in selectColumnsName)
-                {
-                    var propertyValue = ControllerQueryHelper.GetFieldValue<object>(anonymousRow, propName);
-                    if (propertyValue is not null)
-                        convertedRow.Add(propName.ToLower(), propertyValue ?? throw new Exception("property not found"));
-                }
-                result.Add(convertedRow);
-            }
+            var formattedResult = FormatResult(result, selectColumnsName);
 
-            IEnumerable<IDictionary<string, object>> resultRange = result;
-            if (options.Skip is not null)
-                resultRange = resultRange.Skip(options.Skip.Value);
-
-            if (options.Top is not null)
-                resultRange = resultRange.Take(options.Top.Value);
-
-            if (options.Count is not null)
-            {
-                var jsonCountRes = JsonSerializer.Deserialize<object>(JsonSerializer.Serialize(resultRange, _jsonSettings));
-
-                return Ok(new { items = jsonCountRes, result.Count });
-            }
-
-            var jsonRes = JsonSerializer.Deserialize<object>(JsonSerializer.Serialize(resultRange, _jsonSettings));
-
-
-            return Ok(new { items = jsonRes });
+            return ReturnFormattedResult(formattedResult, options);
         }
 
-        if (options.Count is not null)
+        // Handle count
+        if (options.Count != null)
         {
-            var queryResultCount = query.ToList();
+            var totalCount = query.Count();
+            var pagedResult = ApplyPaging(query, options).ToList();
 
-            IEnumerable<TEntity> resultRange = queryResultCount;
-            if (options.Skip is not null)
-                resultRange = resultRange.Skip(options.Skip.Value);
-            if (options.Top is not null)
-                resultRange = resultRange.Take(options.Top.Value);
-
-            var jsonFullCountRes = JsonSerializer.Deserialize<object>(JsonSerializer.Serialize(resultRange, _jsonSettings));
-
-            return Ok(new { items = jsonFullCountRes, queryResultCount.Count });
+            return Ok(new { items = pagedResult, count = totalCount });
         }
 
-        if (options.Skip is not null)
-            query = query.Skip(options.Skip.Value);
+        // Default case
+        var finalResult = ApplyPaging(query, options).ToList();
 
-        if (options.Top is not null)
-            query = query.Take(options.Top.Value);
-
-        var queryResult = query.ToList();
-
-        if (queryResult is null || queryResult.Count == 0)
+        if (finalResult == null || finalResult.Count == 0)
             return Ok(new { items = Array.Empty<TEntity>() });
 
-        var jsonFullRes = JsonSerializer.Deserialize<object>(JsonSerializer.Serialize(queryResult, _jsonSettings));
-
-        return Ok(new { items = jsonFullRes });
+        return Ok(new { items = finalResult });
     }
 
-    [Route("GetById/{id}")]
     [HttpGet]
+    [Route("GetById/{id}")]
     [ProducesResponseType((int)HttpStatusCode.NotFound)]
     public virtual async Task<ActionResult<TEntity>> GetById(int id)
     {
-        var item = await _dataService.GetById(id);
-        if (item is null)
-            return NotFound();
-        else
-            return item;
+        TEntity? item = await _dataService.GetById(id);
+        return item == null ? NotFound() : Ok(item);
     }
 
-    [Route("Insert")]
     [HttpPost]
+    [Route("Insert")]
     [ProducesResponseType(typeof(int), (int)HttpStatusCode.OK)]
-    [ProducesResponseType((int)HttpStatusCode.NotFound)]
+    [ProducesResponseType((int)HttpStatusCode.BadRequest)]
     public virtual async Task<ActionResult> Insert(TEntity? item)
     {
         if (item == null)
@@ -184,62 +108,138 @@ public class GenericController<TEntity>(IGenericCoreService<TEntity> dataService
 
         try
         {
-            var res = await _dataService.Insert(item);
-
-            return Ok(res);
+            TEntity result = await _dataService.Insert(item);
+            return Ok(result);
         }
-        catch
+        catch (Exception ex)
         {
-            return BadRequest();
+            return BadRequest($"Failed to insert the item: {ex.Message}");
         }
     }
 
-    [Route("Update")]
     [HttpPut]
-    [ProducesResponseType(typeof(int), (int)HttpStatusCode.OK)]
-    [ProducesResponseType((int)HttpStatusCode.NotFound)]
+    [Route("Update")]
+    [ProducesResponseType((int)HttpStatusCode.NoContent)]
+    [ProducesResponseType((int)HttpStatusCode.BadRequest)]
     public virtual IActionResult Update(TEntity? item)
     {
         if (item == null)
             return BadRequest();
 
-        int updateCount = _dataService.Update(item);
-
-        if (updateCount > 0)
-            return NoContent();
-        else
-            return BadRequest();
+        try
+        {
+            int updateCount = _dataService.Update(item);
+            return updateCount > 0 ? NoContent() : BadRequest("Failed to update the item.");
+        }
+        catch (Exception ex)
+        {
+            return BadRequest($"An error occurred while updating the item: {ex.Message}");
+        }
     }
 
-    [Route("DeleteById/{id}")]
     [HttpDelete]
+    [Route("DeleteById/{id}")]
     [ProducesResponseType(typeof(bool), (int)HttpStatusCode.OK)]
     [ProducesResponseType((int)HttpStatusCode.NotFound)]
     public virtual async Task<IActionResult> DeleteById(int id)
     {
-        try 
+        try
         {
-            var isDeleted = await _dataService.Delete(id);
-
-            return Ok(isDeleted);
+            bool isDeleted = await _dataService.Delete(id);
+            return isDeleted ? Ok(true) : NotFound();
         }
-        catch 
+        catch (Exception ex)
         {
-            return Ok(false);
+            return StatusCode(500, $"An error occurred while deleting the item: {ex.Message}");
         }
     }
 
-    [Route("Delete")]
     [HttpDelete]
+    [Route("Delete")]
     [ProducesResponseType(typeof(bool), (int)HttpStatusCode.OK)]
     [ProducesResponseType((int)HttpStatusCode.NotFound)]
     public virtual IActionResult Delete(TEntity item)
     {
-        var isDeleted = _dataService.Delete(item);
+        if (item == null)
+            return BadRequest();
 
-        if (!isDeleted)
-            return NotFound(isDeleted);
-        else
-            return Ok(isDeleted);
+        bool isDeleted = _dataService.Delete(item);
+        return isDeleted ? Ok(true) : NotFound();
     }
+
+    private static List<string> GetSelectColumnNames(SelectExpandQueryOption selectExpand, Type entityType)
+    {
+        var selectColumnsName = new List<string>();
+
+        if (selectExpand.RawSelect != null)
+        {
+            selectColumnsName.AddRange(selectExpand.RawSelect.Split(','));
+        }
+        else if (selectExpand.RawExpand != null)
+        {
+            var expandProperties = selectExpand.RawExpand.Split(',').ToList();
+            var entityProperties = entityType.GetProperties(BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+
+            foreach (var property in entityProperties)
+            {
+                if (expandProperties.Contains(property.Name, StringComparer.InvariantCultureIgnoreCase))
+                {
+                    selectColumnsName.Add(property.Name);
+                    continue;
+                }
+
+                if (!property.CustomAttributes.Any(attr => attr.AttributeType.Name == "JsonIgnoreAttribute"))
+                {
+                    selectColumnsName.Add(property.Name);
+                }
+            }
+        }
+
+        return selectColumnsName;
+    }
+
+    private static List<IDictionary<string, object>> FormatResult(List<object> result, List<string> selectColumnsName)
+    {
+        var formattedResult = new List<IDictionary<string, object>>();
+
+        foreach (var row in result)
+        {
+            var convertedRow = new Dictionary<string, object>();
+            foreach (var propName in selectColumnsName)
+            {
+                var propertyValue = ControllerQueryHelper.GetFieldValue<object>(row, propName);
+                if (propertyValue != null)
+                {
+                    convertedRow[propName.ToLower()] = propertyValue;
+                }
+            }
+            formattedResult.Add(convertedRow);
+        }
+
+        return formattedResult;
+    }
+
+    private IActionResult ReturnFormattedResult(List<IDictionary<string, object>> result, ODataQueryOptions<TEntity> options)
+    {
+        var pagedResult = ApplyPaging(result.AsQueryable(), options);
+
+        if (options.Count != null)
+        {
+            return Ok(new { items = pagedResult, count = result.Count });
+        }
+
+        return Ok(new { items = pagedResult });
+    }
+
+    private static IQueryable<T> ApplyPaging<T>(IQueryable<T> query, ODataQueryOptions<TEntity> options)
+    {
+        if (options.Skip != null)
+            query = query.Skip(options.Skip.Value);
+
+        if (options.Top != null)
+            query = query.Take(options.Top.Value);
+
+        return query;
+    }
+
 }

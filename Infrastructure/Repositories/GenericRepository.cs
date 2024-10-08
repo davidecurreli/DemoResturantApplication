@@ -4,106 +4,80 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-/// <summary>
-/// Generic repository for all Domain.Entities.
-/// 
-/// This repository implements the IGenericRepository(TEntity) interface and is used to perform CRUD operations on the lowest level of the application (the data layer).
-/// 
-/// By design, this repository is not aware of the business logic and is not aware of the existence of the service layer.
-/// To interact with multiple entities, do not specialize this repository, instead use the IGenericCoreService(TEntity) interface.
-/// 
-/// Any specialization of this repository should be done in the service layer, not in the data layer. 
-/// </summary>
-/// <typeparam name="TEntity">The BaseEntity(int) type</typeparam>
-public class GenericRepository<TEntity>(DbContextClass context) : IGenericRepository<TEntity> where TEntity : BaseEntity
+public class GenericRepository<TEntity> : IGenericRepository<TEntity> where TEntity : BaseEntity
 {
-    protected readonly DbContextClass _dbContext = context;
+    protected readonly DbContextClass _dbContext;
+    protected readonly DbSet<TEntity> _dbSet;
 
-    #region CREATE
-    /// <summary>
-    /// Insert an entity into the database
-    /// </summary>
-    /// <param name="entity">TEntity</param>
+    public GenericRepository(DbContextClass context)
+    {
+        _dbContext = context ?? throw new ArgumentNullException(nameof(context));
+        _dbSet = _dbContext.Set<TEntity>();
+    }
+
     public void Insert(TEntity entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         try
         {
-            _dbContext.Set<TEntity>().Add(entity);
+            _dbSet.Add(entity);
         }
         catch (Exception ex)
         {
+            // Should log the exception here
             throw;
         }
     }
-    #endregion
 
-    #region READ
-    /// <summary>
-    /// Get an entity by id from the database
-    /// </summary>
-    /// <param name="predicate">Expression[Func[TEntity, bool]] predicate</param>
-    /// <returns>TEntity</returns>
     public IQueryable<TEntity> Get(Expression<Func<TEntity, bool>> predicate)
     {
-        return _dbContext.Set<TEntity>().Where(predicate);
+        return _dbSet.Where(predicate);
     }
 
-    /// <summary>
-    /// Get an entity by id from the database
-    /// </summary>
-    /// <returns>IQueryable(TEntity)</returns>
     public IQueryable<TEntity> GetQueryable()
     {
-        return _dbContext.Set<TEntity>().AsQueryable();
+        return _dbSet.AsQueryable();
     }
 
-    /// <summary>
-    /// Get the list of entities from the database, optionally override the soft delete filter
-    /// </summary>
-    /// <param name="overrideSoftDelete">whether or not to retrieve even soft delete rows</param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
     public async Task<IReadOnlyList<TEntity>> GetListAsync()
     {
-        return await _dbContext.Set<TEntity>().ToListAsync();
+        return await _dbSet.ToListAsync();
     }
 
-    /// <summary>
-    /// Get an entity by id from the database
-    /// </summary>
-    /// <param name="id">int</param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
     public async Task<TEntity?> GetByIdAsync(int id)
     {
-        var idProperty = typeof(TEntity).GetProperty("Id") ?? throw new Exception("Expression parameters cannot be null");
+        var idProperty = typeof(TEntity).GetProperty("Id") ?? throw new InvalidOperationException("Entity does not have an Id property");
 
         ParameterExpression param = Expression.Parameter(typeof(TEntity), "x");
         var body = Expression.Equal(Expression.Property(param, idProperty), Expression.Constant(id));
 
-        var lamdaExpression = Expression.Lambda<Func<TEntity, bool>>(body, param);
+        var lambdaExpression = Expression.Lambda<Func<TEntity, bool>>(body, param);
+
         try
         {
-            return await _dbContext.Set<TEntity>().FirstOrDefaultAsync(lamdaExpression);
+            return await _dbSet.FirstOrDefaultAsync(lambdaExpression);
         }
-        catch (Exception ex) { throw; }
+        catch (Exception ex)
+        {
+            // Should log the exception here
+            throw;
+        }
     }
-    #endregion
 
-    #region UPDATE
-    /// <summary>
-    /// Try to Update an entity and save changes to the database.
-    /// </summary>
-    /// <param name="entity"></param>
     public int Update(TEntity entity)
     {
-        _dbContext.Set<TEntity>().Update(entity);
+        ArgumentNullException.ThrowIfNull(entity);
 
-        var saveFailed = false;
+        _dbSet.Update(entity);
+
+        bool saveFailed;
         do
         {
-            saveFailed = false;
-            try { return _dbContext.SaveChanges(); }
+            try
+            {
+                return _dbContext.SaveChanges();
+            }
             catch (DbUpdateConcurrencyException ex)
             {
                 saveFailed = true;
@@ -111,41 +85,42 @@ public class GenericRepository<TEntity>(DbContextClass context) : IGenericReposi
                 // Update the values of the entity that failed to save from the store
                 ex.Entries.Single().Reload();
             }
-            catch (Exception ex) { throw; }
+            catch (Exception ex)
+            {
+                // Should log the exception here
+                throw;
+            }
         } while (saveFailed);
 
         return 0;
     }
-    #endregion
 
-    #region DELETE - HARD
-    /// <summary>
-    /// Delete an entity from the database
-    /// </summary>
-    /// <param name="entity"></param>
     public void Delete(TEntity entity)
     {
+        ArgumentNullException.ThrowIfNull(entity);
+
         try
         {
-            _dbContext.Set<TEntity>().Remove(entity);
+            _dbSet.Remove(entity);
             _dbContext.SaveChanges();
         }
-        catch (Exception ex) { throw; }
+        catch (Exception ex)
+        {
+            // Should log the exception here
+            throw;
+        }
     }
-    #endregion
 
-    #region SAVE 
-    /// <summary>
-    /// Save changes to the database
-    /// </summary>
-    /// <returns></returns>
     public async Task<int> SaveAsync()
     {
         try
         {
             return await _dbContext.SaveChangesAsync();
         }
-        catch (Exception ex) { throw; }
+        catch (Exception ex)
+        {
+            // Should log the exception here
+            throw;
+        }
     }
-    #endregion
 }

@@ -1,5 +1,4 @@
-﻿using Domain;
-using Infrastructure.Helpers;
+﻿using Infrastructure.Helpers;
 using Infrastructure.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,7 +6,7 @@ namespace Infrastructure;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddInfrastructure(this IServiceCollection services/*, IConfigurationBuilder configuration*/)
+    public static IServiceCollection AddInfrastructure(this IServiceCollection services)
     {
         // Inject all Services in Services folder
         InstantiateCoreServices(services);
